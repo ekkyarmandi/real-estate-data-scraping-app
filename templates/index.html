@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+<!--  -->
+{% block content %}
+<div class="font-mono flex mb-8">
+  <div class="flex gap-3 items-center">
+    <div class="flex gap-3 items-center border rounded-md px-2 py-1">
+      <p>Season:</p>
+      <select name="period" id="period" class="rounded-md bg-slate-800" value="{{ current_date }}">
+        <option value="2024-04-01">Apr 2024</option>
+        <option value="2024-03-01">Mar 2024</option>
+        <option value="2024-02-01">Feb 2024</option>
+        <option value="2024-01-01">Jan 2024</option>
+      </select>
+    </div>
+    <p class="border rounded-md px-2 py-1">Total Scraped: {{ total_property|separate }}</p>
+    <p class="border rounded-md px-2 py-1">New Scraped: {{ new.total|separate }} ({{ '%.2f' | format(new.perc) }}%)</p>
+    <p class="border rounded-md px-2 py-1">Excluded: {{ excluded.total|separate }} ({{ '%.2f' | format(excluded.perc) }}%)</p>
+    <div class="flex gap-3 border rounded-md px-2 py-1">
+      <p>Missing URLs: <a id="missing-urls" href="#" target="_blank" class="">0</a></p>
+      <button id="check-missing-urls" style="width: 24px; height: 24px" class="p-1 rounded-full bg-blue-500 hover:bg-blue-600 text-sm flex justify-center items-center" onclick="downloadURLs()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white">
+          <path
+            d="M12 4C9.4095 4 7.10606 5.23053 5.64274 7.14274L8 9.5H2V3.5L4.21863 5.71863C6.05061 3.452 8.85558 2 12 2 17.5228 2 22 6.47715 22 12H20C20 7.58172 16.4183 4 12 4ZM4 12C4 16.4183 7.58172 20 12 20 14.5905 20 16.894 18.7695 18.3573 16.8573L16 14.5 22 14.5V20.5L19.7814 18.2814C17.9494 20.548 15.1444 22 12 22 6.47715 22 2 17.5228 2 12H4Z"
+          ></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+<div class="text-sm mb-8">
+  <p>Table Caption</p>
+  <table class="border">
+    <thead>
+      <tr>
+        <th></th>
+        <th class="p-2">IDR</th>
+        <th class="p-2">USD</th>
+        <th class="p-2">Bedrooms</th>
+        <th class="p-2">Bathrooms</th>
+        <th class="p-2">Land Size</th>
+        <th class="p-2">Build Size</th>
+        <th class="p-2">Leasehold Years</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="px-2">Count</td>
+        {% for val in stats.count %}
+        <td class="px-2">{{ val|separate }}</td>
+        {% endfor %}
+      </tr>
+      <tr>
+        <td class="px-2">Min.</td>
+        {% for val in stats.min %}
+        <td class="px-2">{{ val|separate }}</td>
+        {% endfor %}
+      </tr>
+      <tr>
+        <td class="px-2">Mean</td>
+        {% for val in stats.mean %}
+        <td class="px-2">{{ "%.2f" | format(val) }}</td>
+        {% endfor %}
+      </tr>
+      <tr>
+        <td class="px-2">Q1 (25%)</td>
+        {% for val in stats.p25 %}
+        <td class="px-2">{{ val|separate }}</td>
+        {% endfor %}
+      </tr>
+      <tr>
+        <td class="px-2">Q2 (50%)</td>
+        {% for val in stats.p50 %}
+        <td class="px-2">{{ val|separate }}</td>
+        {% endfor %}
+      </tr>
+      <tr>
+        <td class="px-2">Q3 (75%)</td>
+        {% for val in stats.p75 %}
+        <td class="px-2">{{ val|separate }}</td>
+        {% endfor %}
+      </tr>
+      <tr>
+        <td class="px-2">Max.</td>
+        {% for val in stats.max %}
+        <td class="px-2">{{ val|separate }}</td>
+        {% endfor %}
+      </tr>
+    </tbody>
+  </table>
+</div>
+<div class="mb-8"><button class="px-2 py-1 rounded bg-indigo-500" onclick="setTab(this)">SET TAB</button></div>
+<div class="flex gap-6 mb-8">
+  <div>
+    <h2 class="text-lg font-semibold">Contract Type</h2>
+    <ul class="list-inside ps-1">
+      {% for prop in contract_types %}
+      <li>
+        <div class="flex gap-3 items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" style="width: 14px; height: 14px" viewBox="0 0 512 512" fill="white">
+            <path d="M464 256A208 208 0 1 0 48 256a208 208 0 1 0 416 0zM0 256a256 256 0 1 1 512 0A256 256 0 1 1 0 256zm256-96a96 96 0 1 1 0 192 96 96 0 1 1 0-192z" />
+          </svg>
+          {% if prop.name == 'Freehold' or prop.name == 'Leasehold' %}
+          <p class="py-1">
+            <span>{{ prop.name }}</span>
+            <span>({{ prop.count|separate }})</span>
+          </p>
+          {% else %}
+          <a id="ct-{{ prop.name }}" href="/contract-type?value={{ prop.name }}" class="py-1 hover:underline" data-count="{{ prop.count|separate }}" data-name="{{ prop.name }}">
+            <span>{{ prop.name }}</span>
+            <span>({{ prop.count|separate }})</span>
+          </a>
+          <div class="relative">
+            <button class="actions rounded-md bg-slate-500 hover:bg-slate-600 flex justify-center items-center" style="width: 24px; height: 24px">
+              <svg xmlns="http://www.w3.org/2000/svg" style="width: 24px; height: 24px" viewBox="0 0 24 24" fill="white"><path d="M12 16L6 10H18L12 16Z"></path></svg>
+            </button>
+            <ul id="action-menu" class="z-10 cursor-pointer text-sm whitespace-nowrap absolute rounded-md bg-slate-500 text-white top-0 left-0 hidden">
+              <li class="px-2 py-1 rounded-t-md hover:bg-slate-600" onclick="action(this, 'rename', 'ct-{{ prop.name }}', 'contract-type')">Rename</li>
+              <li class="px-2 py-1 rounded-b-md hover:bg-slate-600" onclick="action(this, 'exclude', 'ct-{{ prop.name }}', 'contract-type')">Exclude</li>
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div>
+    <h2 class="text-lg font-semibold">Property Type</h2>
+    <ul class="list-inside ps-1">
+      {% for prop in property_types %}
+      <li>
+        <div class="flex gap-3 items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" style="width: 14px; height: 14px" viewBox="0 0 512 512" fill="white">
+            <path d="M464 256A208 208 0 1 0 48 256a208 208 0 1 0 416 0zM0 256a256 256 0 1 1 512 0A256 256 0 1 1 0 256zm256-96a96 96 0 1 1 0 192 96 96 0 1 1 0-192z" />
+          </svg>
+          <a id="pt-{{ prop.name }}" href="/property-type?value={{ prop.name }}" class="py-1 hover:underline" data-count="{{ prop.count|separate }}" data-name="{{ prop.name }}">
+            <span>{{ prop.name }}</span>
+            <span>({{ prop.count|separate }})</span>
+          </a>
+          <div class="relative">
+            <button class="actions rounded-md bg-slate-500 hover:bg-slate-600 flex justify-center items-center" style="width: 24px; height: 24px">
+              <svg xmlns="http://www.w3.org/2000/svg" style="width: 24px; height: 24px" viewBox="0 0 24 24" fill="white"><path d="M12 16L6 10H18L12 16Z"></path></svg>
+            </button>
+            <ul id="action-menu" class="z-10 cursor-pointer text-sm whitespace-nowrap absolute rounded-md bg-slate-500 text-white top-0 left-0 hidden">
+              <li class="px-2 py-1 rounded-t-md hover:bg-slate-600" onclick="action(this, 'rename', 'pt-{{ prop.name }}', 'property-type')">Rename</li>
+              <li class="px-2 py-1 rounded-b-md hover:bg-slate-600" onclick="action(this, 'show-exclude-menu', 'pt-{{ prop.name }}', 'property-type')">Exclude</li>
+            </ul>
+            <ul id="exclude-menu" class="z-10 cursor-pointer text-sm whitespace-nowrap absolute rounded-md bg-slate-500 text-white top-0 left-0 hidden">
+              <li class="px-2 py-1 rounded-t-md hover:bg-slate-600" onclick="action(this, 'exclude', '{{ prop.name }}', 'is_land')">Is Land</li>
+              <li class="px-2 py-1 hover:bg-slate-600" onclick="action(this, 'exclude', '{{ prop.name }}', 'is_hotel')">Is Hotel</li>
+              <li class="px-2 py-1 rounded-b-md hover:bg-slate-600" onclick="action(this, 'exclude', '{{ prop.name }}', 'is_commercial')">Is Commercial</li>
+            </ul>
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div>
+    <h2 class="text-lg font-semibold">Incorrect/Missing Values</h2>
+    <ul class="list-inside ps-1">
+      {% for prop in missing_attributes %}
+      <li>
+        <div class="flex gap-3 items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" style="width: 14px; height: 14px" viewBox="0 0 512 512" fill="white">
+            <path d="M464 256A208 208 0 1 0 48 256a208 208 0 1 0 416 0zM0 256a256 256 0 1 1 512 0A256 256 0 1 1 0 256zm256-96a96 96 0 1 1 0 192 96 96 0 1 1 0-192z" />
+          </svg>
+          {% if prop.count > 0 %}
+          <a href="/missing/{{ prop.path }}" class="py-1 hover:underline">{{ prop.name }} ({{ prop.count|separate }})</a>
+          {% else %}
+          <p class="py-1 cursor-default text-gray-500">{{ prop.name }} ({{ prop.count|separate }})</p>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}

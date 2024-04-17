@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+<!--  -->
+{% block content %}
+<div class="mb-8">
+  <a class="px-4 py-2 bg-gray-500 hover:bg-gray-600 rounded-md font-semibold" href="/">Back</a>
+</div>
+<div>
+  <h1 class="text-xl font-semibold mb-4">
+    <span>Property Types:</span>
+    <span>{{sub_title}}</span>
+  </h1>
+  <ul class="list-decimal ps-4">
+    {% for p in properties %}
+    <li class="bg-slate-800 rounded-md mb-4 p-4">
+      <h3>
+        <a href="{{ p.url }}" class="text-lg font-semibold hover:underline">{{ p.title }}</a>
+      </h3>
+      <div>
+        <p>{{ p.description }}</p>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}
+<!--  -->
+{% block script %}
+<script src="{{ url_for('scripts', path='property.js') }}"></script>
+{% endblock %}

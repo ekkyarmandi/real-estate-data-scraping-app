@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+<!--  -->
+{% block content %}
+<div class="mb-8">
+  <a class="px-4 py-2 bg-gray-500 hover:bg-gray-600 rounded-md font-semibold" href="/">Back</a>
+</div>
+<div>
+  <h1 class="text-xl font-semibold mb-4">
+    <span>Contract Types:</span>
+    <span>{{sub_title}}</span>
+  </h1>
+  <ul class="list-disc list-inside ps-1">
+    {% for url in urls %}
+    <li>
+      <a href="{{url}}" class="text-blue-500 underline" target="_blank">{{url}}</a>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

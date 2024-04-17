@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+<!--  -->
+{% block content %}
+<div class="mb-8">
+  <div class="mb-8">
+    <a class="px-4 py-2 bg-gray-500 hover:bg-gray-600 rounded-md font-semibold" href="/">Back</a>
+  </div>
+  <h1 class="text-lg font-semibold mb-4">{{ title }} ({{ current_total|separate }} of {{ total_missings|separate }})</h1>
+  <div id="pagination" class="mb-4 flex justify-between">
+    <button class="prev-btn px-2 py-1 bg-gray-500 hover:bg-gray-600 enabled:opacity-100 opacity-50 rounded-md text-sm">
+      <a href="#">Prev</a>
+    </button>
+    <p>
+      <span>page {{current_page}}</span>
+      <span>of</span>
+      <span>{{max_page}}</span>
+    </p>
+    <button class="next-btn px-2 py-1 bg-gray-500 enabled:hover:bg-gray-600 enabled:opacity-100 opacity-50 rounded-md text-sm">
+      <a href="#">Next</a>
+    </button>
+  </div>
+  <ul class="flex flex-col gap-3">
+    {% for p in properties %}
+    <li class="p-4 bg-slate-800 rounded-md flex items-start gap-3">
+      <div class="">
+        {% if p.image_url %}
+        <img class="aspect-ratio rounded-lg bg-gray-500" src="{{ p.image_url }}" alt="{{ p.title }}" style="width: 266.67px; height: 200px" />
+        {% else %}
+        <div class="bg-amber-500 aspect-ratio rounded-lg" style="width: 266.67px; height: 200px"></div>
+        {% endif %}
+      </div>
+      <div class="flex flex-col gap-4">
+        <p class="text-indigo-400">
+          <span>{{ p.source }} | {{ p.contract_type }}</span>
+          {% if p.contract_type == 'Leasehold' and p.leasehold_years != None %}
+          <span>({{ p.leasehold_years }} years)</span>
+          {% endif %}
+        </p>
+        <h3 class="text-lg font-semibold">
+          <a href="{{ p.url }}" target="_blank" class="hover:underline">
+            <span>{{ p.title }}</span>
+          </a>
+        </h3>
+        <div class="flex gap-3">
+          <p>
+            <span>price:</span>
+            {% if p.currency == 'IDR' %}
+            <span>Rp</span>
+            {% else %}
+            <span>$</span>
+            {% endif %}
+            <!--  -->
+            {% if p.price or p.price == 0 %}
+            <span>{{ p.price|separate }}</span>
+            {% else %}
+            <span>0</span>
+            {% endif %}
+          </p>
+          <p>
+            <span>type:</span>
+            <span>{{ p.property_type }}</span>
+          </p>
+          <p>
+            <span>tab:</span>
+            <span>{{ p.tab }}</span>
+          </p>
+          <p>
+            <span>location:</span>
+            <span>{{ p.location }}</span>
+          </p>
+        </div>
+        <div class="flex gap-3">
+          <p>
+            <span>Bedrooms:</span>
+            <span>{{ p.bedrooms }}</span>
+          </p>
+          <p>
+            <span>Bathrooms:</span>
+            <span>{{ p.bathrooms }}</span>
+          </p>
+          <p>
+            <span>Land Size:</span>
+            <span>{{ p.land_size }}</span>
+          </p>
+          <p>
+            <span>Build Size:</span>
+            <span>{{ p.build_size }}</span>
+          </p>
+        </div>
+        <div class="flex gap-3">
+          {% for label in p.labels %}
+          <div class="flex w-fit items-center rounded-full text-sm">
+            <p class="ps-2 pe-1 py-1 bg-slate-400 hover:bg-slate-500 rounded-s-full">
+              <a href="/missing/{{label}}">{{label}}</a>
+            </p>
+            <button class="verification-btn ps-1 pe-2 py-1 bg-slate-400/80 hover:bg-slate-500 rounded-e-full">OK</button>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="flex gap-2">
+          <button class="edit-btn px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm" onclick="editProperty(this)">Edit</button>
+          <button class="debug-btn px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm" onclick="debugThis(this, true)">Debug</button>
+          <select class="debug-btn px-2 py-1 bg-orange-600 hover:bg-orange-700 rounded-lg text-sm" onchange="excludeThis(this)">
+            <option value="default">Exclude</option>
+            <option value="price_on_request">Price On Request</option>
+          </select>
+        </div>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+<div>{{key}}</div>
+{% endblock %}
+<!--  -->
+{% block script %}
+<script src="{{ url_for('scripts', path='pagination.js') }}"></script>
+{% endblock %}
