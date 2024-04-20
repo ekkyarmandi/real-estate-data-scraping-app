@@ -1,5 +1,6 @@
 import math
-from fastapi import APIRouter, HTTPException, Request
+from typing import Mapping
+from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime as dt, timedelta
 from api.func import compare, join_strings
 from api.settings import PAGE_SIZE
@@ -8,18 +9,65 @@ from api.models.property import ModelObject, Property
 import json
 import time
 
+from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Boolean,
+    Date,
+    ForeignKey,
+    create_engine,
+)
+from sqlalchemy.orm import relationship
+from sqlalchemy import func, select
+
 from libs.googlespreadsheet import SpreadSheetPipeline
 
+Base = declarative_base()
 router = APIRouter()
+
+engine = create_engine("sqlite:///database.db")
+
+Base.metadata.create_all(engine)
+
+Session = sessionmaker(bind=engine)
+session = Session()
 
 # [ ] Render the result including the history of it
 
+
 ## Object
+class Source(Base):
+    __tablename__ = "source"
+
+    url = Column(String, primary_key=True)
+    source = Column(String, nullable=False)
+    scraped_at = Column(String)
+    is_excluded = Column(Boolean, nullable=False)
+    excluded_by = Column(String)
+
+
+class Properties(Base):
+    __tablename__ = "dev_properties"
+
+    id = Column(Integer, primary_key=True)
+    url = Column(String, ForeignKey("source.url"))
+    created_at = Column(Date, nullable=False)
+    source = Column(String)
+
+
+class ScrapedData(Base):
+    __tablename__ = "data"
+
+    id = Column(Integer, primary_key=True)
+    url = Column(String)
+    created_at = Column(Date)
 
 
 class DateRange:
-    def __init__(self, date_str: str):
-        self.original = dt.strptime(date_str, r"%Y-%m-%d")
+    def __init__(self, date: str):
+        self.original = dt.strptime(date, r"%Y-%m-%d")
         self.start = self.original.strftime(r"%Y-%m-01")
         self.end = self.original.replace(month=self.original.month + 1).replace(
             day=1
@@ -113,50 +161,48 @@ async def query_new_properties(
 
 
 @router.get("/total")
-async def calculate_extracted(
-    request: Request,
-    date: str = dt.now().strftime(r"%Y-%m-01"),
-):
-    # object initialization
-    db = Database()
-    date = DateRange(date)
-    # query with count
-    obj = ModelObject()
-    total_scraped = obj.count(
-        table_name="data",
-        filter=dict(start_date=date.start, end_date=date.end),
-    )
-    total_extracted = Property.objects.count(
-        table_name="dev_properties",
-        filter=dict(
-            start_date=date.start,
-            end_date=date.end,
-        ),
-    )
-    new_scraped = Property.objects.all(
-        table_name="source", filter=dict(scraped_at=date.for_source(), urls_only=True)
-    )
-    # calculate total new proeprty were being extracted
-    query = f"""
-    SELECT COUNT(DISTINCT url) FROM dev_properties
-    WHERE url IN ({ join_strings(new_scraped) });
-    """
-    total_new_extracted = db.get_first(query)
-    # calculate total new property were being excluded
-    query = f"""
-    SELECT COUNT(url) FROM source
-    WHERE url IN ({ join_strings(new_scraped) })
-    AND is_excluded='true';
-    """
-    total_new_excluded = db.get_first(query)
-    result = dict(
+async def calculate_extracted(date: str = Depends(DateRange)):
+    with Session() as session:
+        # count total scraped html/json
+        query = session.query(func.count(ScrapedData.url)).filter(
+            ScrapedData.created_at >= date.start,
+            ScrapedData.created_at <= date.end,
+        )
+        total_scraped = query.scalar()
+        # count total extracted on properties
+        query = session.query(func.count(Properties.url)).filter(
+            Properties.created_at >= date.start,
+            Properties.created_at <= date.end,
+        )
+        total_extracted = query.scalar()
+        # calculate total new proeprty were being extracted
+        query = (
+            select(func.count(func.distinct(Properties.url)))
+            .select_from(
+                Source.__table__.join(Properties, Source.url == Properties.url)
+            )
+            .where(Source.is_excluded == "true")
+        )
+        total_new_extracted = session.execute(query).scalar()
+        # calculate total new property were being excluded
+        query = session.query(func.count(Source.url)).filter(
+            Source.scraped_at == date.for_source(),
+            Source.is_excluded == "true",
+        )
+        total_new_excluded = query.scalar()
+        # calculate total new scraped for selected period
+        query = session.query(func.count(Source.url)).filter(
+            Source.scraped_at == date.for_source(),
+        )
+        total_new_scraped = query.scalar()
+
+    return dict(
         total_scraped=total_scraped,
         total_extracted=total_extracted,
-        total_new_scraped=len(new_scraped),
+        total_new_scraped=total_new_scraped,
         total_new_extracted=total_new_extracted,
         total_new_excluded=total_new_excluded,
     )
-    return result
 
 
 @router.get("/sheet")

@@ -1,6 +1,6 @@
-async function getInfo() {
-  const response = await fetch("/api/v1/dashboard/total");
-  const data = await response.json();
+async function getInfo(date, workbook) {
+  const params = new URLSearchParams({ date: date, workbook: workbook });
+  const data = await fetch("/api/v1/dashboard/total?" + params.toString()).then(res => res.json()).catch((err) => console.log(err));
   const info = document.getElementById("info");
   var extracted_percentage = 100 * data.total_extracted / data.total_scraped;
   if (extracted_percentage > 100.0) {
@@ -281,14 +281,35 @@ async function getUniquePropertyType() {
   }
 }
 
-// main
-getInfo();
-getNewInfo();
-getSpreadsheetURLs();
-getPropertyLabels();
-getPropertyExcludedBy();
-getUniquePropertyType();
+async function loadWorkbook() {
+  // get the date
+  const selectedDate = document.getElementById("period").value;
+  // get the workbook
+  const selectedWorkbook = document.getElementById("workbook").value;
+  console.log(selectedDate, selectedWorkbook);
+  // make a get requests
+  await fetch(`/api/dev?date=${selectedDate}&workbook=${selectedWorkbook}`)
+    .then((res) => {
+      // show the main container
+      document.querySelector(".main-container").classList.remove("hidden");
+      // load the data
+      getInfo(selectedDate, selectedWorkbook);
+      // getNewInfo();
+      // getSpreadsheetURLs();
+      // getPropertyLabels();
+      // getPropertyExcludedBy();
+      // getUniquePropertyType();
+    })
+    .catch((err) => console.log(err));
+  // show the result on the screen
+}
 
-// load missing 
-getProperties('missing_bathrooms');
+function assignEventHandler() {
+  const loadBtn = document.querySelector(".btn-load");
+  loadBtn.addEventListener("click", loadWorkbook);
+}
 
+
+// init
+assignEventHandler();
+// getProperties('missing_bathrooms');
