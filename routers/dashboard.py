@@ -53,6 +53,7 @@ class Properties(Base):
 
     id = Column(Integer, primary_key=True)
     url = Column(String, ForeignKey("source.url"))
+    property_type = Column(String)
     created_at = Column(Date, nullable=False)
     source = Column(String)
 
@@ -95,7 +96,7 @@ def example_function_here():
 ## API Endpoints ##
 
 
-@router.get("/")
+@router.get("/")  # refactor this
 async def query_properties(
     request: Request,
     date: str = dt.now().strftime(r"%Y-%m-01"),
@@ -119,48 +120,69 @@ async def query_properties(
     return results
 
 
-@router.get("/new-info")
+@router.get("/new-info")  # refactored
 async def query_new_properties(
-    request: Request,
-    date: str = dt.now().strftime(r"%Y-%m-01"),
+    date: DateRange = Depends(DateRange),
 ):
-    date = DateRange(date)
-    urls = Property.objects.all(
-        table_name="source", filter=dict(scraped_at=date.for_source(), urls_only=True)
-    )
+    with Session() as session:
+        urls = (
+            session.query(Source.url)
+            .filter(Source.scraped_at == date.for_source())
+            .all()
+        )
+        urls = [i[0] for i in urls]
     db = Database()
-    keywords = ["missing", "invalid"]
+    # calculate listings with issues
     total = {}
-    for key in keywords:
+    query = f"""
+    SELECT
+        url,
+        SUM(label LIKE 'missing_%'),
+        SUM(label LIKE 'invalid_%')
+    FROM sourcelabels
+    WHERE url IN ({ join_strings(urls) })
+    AND is_verified == 0
+    GROUP BY url;
+    """
+    result1 = db.get_records(query)
+    total_missing_values = len([i for i in result1 if int(i[1])])
+    total_invalid_values = len([i for i in result1 if int(i[2])])
+    # calculate listings with solved issue
+    query = f"""
+    SELECT
+        url,
+        SUM(label LIKE 'missing_%'),
+        SUM(label LIKE 'invalid_%')
+    FROM sourcelabels
+    WHERE url IN ({ join_strings(urls) })
+    AND is_verified > 0
+    GROUP BY url;
+    """
+    result2 = db.get_records(query)
+    total_missing_solved = len([i for i in result2 if int(i[1])])
+    total_invalid_solved = len([i for i in result2 if int(i[2])])
+    # how many url that has missing values?
+    for key in ["missing", "invalid"]:
         query = f"""
-        SELECT COUNT(url) AS total_item FROM (
-            SELECT url, SUM(NOT is_verified) AS total_unsolved FROM sourcelabels
-            WHERE label LIKE '{key}%' AND url IN ({join_strings(urls)})
-            GROUP BY url HAVING total_unsolved > 0
-        );
+        SELECT COUNT(DISTINCT url) FROM sourcelabels
+        WHERE label LIKE '{key}_%'
+        AND url IN ({ join_strings(urls) });
         """
-        total["{}_values".format(key)] = db.get_first(query)
-    # calculate the properties with solved issue
-    for key in keywords:
-        query = f"""
-        SELECT COUNT(url) AS total_item FROM (
-            SELECT url, SUM(NOT is_verified) AS total_unsolved FROM sourcelabels
-            WHERE label LIKE '{key}%' AND url IN ({join_strings(urls)})
-            GROUP BY url HAVING total_unsolved == 0
-        );
-        """
-        total["{}_solved".format(key)] = db.get_first(query)
+        total[f"urls_with_{key}"] = db.get_first(query)
+    print(total)
+
+    # how many url that has invalid values?
     results = dict(
         total_new_extracted=len(urls),
-        total_missing_values=int(total["missing_values"]),
-        total_invalid_values=int(total["invalid_values"]),
-        total_missing_solved=int(total["missing_solved"]),
-        total_invalid_solved=int(total["invalid_solved"]),
+        total_missing_values=total_missing_values,
+        total_invalid_values=total_invalid_values,
+        total_missing_solved=100 * total_missing_solved / total["urls_with_missing"],
+        total_invalid_solved=100 * total_invalid_solved / total["urls_with_invalid"],
     )
     return results
 
 
-@router.get("/total")
+@router.get("/total")  # refactored
 async def calculate_extracted(date: str = Depends(DateRange)):
     with Session() as session:
         # how many data are being scraped? Count total scraped data from data table within selected period
@@ -377,7 +399,7 @@ async def update_spreadsheets_value(
     )
 
 
-@router.get("/all")
+@router.get("/all")  # refactor this
 async def get_all_properties(
     request: Request,
     date: str = dt.now().strftime(r"%Y-%m-01"),
@@ -396,27 +418,40 @@ async def get_all_properties(
     return dict(count=len(properties))
 
 
-@router.get("/exclusions")
-async def find_excluded_by(request: Request):
-    query = """
-    SELECT excluded_by, COUNT(DISTINCT url) as total FROM source
-    WHERE is_excluded='true' AND url IN (
-        SELECT DISTINCT url FROM dev_properties
-    ) GROUP BY excluded_by;
-    """
-    db = Database()
-    records = [dict(name=i[0], count=i[1]) for i in db.get_records(query)]
+@router.get("/exclusions")  # refactored
+async def find_excluded_by(date: DateRange = Depends(DateRange)):
+    with Session() as session:
+        result = (
+            session.query(func.distinct(Properties.url))
+            .filter(
+                Properties.created_at >= date.start,
+                Properties.created_at <= date.end,
+            )
+            .all()
+        )
+        unique_urls = [i[0] for i in result]
+        query = (
+            select(
+                Source.excluded_by,
+                func.count(Source.url).label("total"),
+            )
+            .where(
+                Source.is_excluded == "true",
+                Source.url.in_(unique_urls),
+            )
+            .group_by(Source.excluded_by)
+        )
+        result = session.execute(query)
+        records = [dict(name=i.excluded_by, count=i.total) for i in result]
     return records
 
 
-@router.get("/labels")
+@router.get("/labels")  # refactor this
 async def find_missing_and_invalid_labels(
-    request: Request,
-    date: str = dt.now().strftime(r"%Y-%m-01"),
+    date: DateRange = Depends(DateRange),
 ):
     # initiate the object
     db = Database()
-    date = DateRange(date)
     filter = dict(
         start_date=date.start,
         end_date=date.end,
@@ -456,9 +491,8 @@ async def verified_property_label(request: Request, id: str, label: str):
     raise HTTPException(status_code=403, detail="URL not found")
 
 
-@router.get("/label/{label:path}")
+@router.get("/label/{label:path}")  # refactor this
 def get_properties_with_issues(
-    request: Request,
     label: str,
     date: str = dt.now().strftime(r"%Y-%m-01"),
     page: int = 1,
@@ -604,25 +638,58 @@ async def update_property(request: Request):
     return data
 
 
-@router.get("/property-types")
-async def get_property_types(request: Request):
-    db = Database()
-    query = """
-    SELECT property_type, COUNT(DISTINCT url) AS total FROM dev_properties
-    WHERE property_type != "" GROUP BY property_type ORDER BY total DESC;
-    """
-    records = db.get_records(query)
-    records = [dict(name=i[0], count=i[1]) for i in records]
+@router.get("/property-types")  # refactored
+async def find_property_types(date: DateRange = Depends(DateRange)):
+    with Session() as session:
+        query = (
+            select(
+                Properties.property_type,
+                func.count(func.distinct(Properties.url)).label("total"),
+            )
+            .where(
+                Properties.property_type != "",
+                Properties.created_at >= date.start,
+                Properties.created_at <= date.end,
+            )
+            .group_by(Properties.property_type)
+            .order_by(func.count(func.distinct(Properties.url)).desc())
+        )
+        records = session.execute(query)
+        records = [dict(name=i.property_type, count=i.total) for i in records]
     return records
 
 
-@router.get("/property-types/unit")
-async def get_property_types(request: Request, page: str = 1, type: str = "Villa"):
-    db = Database()
-    query = f"""
-    SELECT DISTINCT url FROM dev_properties
-    WHERE property_type = '{type}' LIMIT 100;
-    """
-    urls = db.fetchall(query)
+@router.get("/property-types/unit")  # refactored
+async def get_property_types(
+    page: int = 1,
+    type: str = "Villa",
+    date: DateRange = Depends(DateRange),
+):
+    with Session() as session:
+        filter_condition = [
+            Properties.property_type == type,
+            Properties.created_at >= date.start,
+            Properties.created_at <= date.end,
+        ]
+        # count total urls
+        total_urls = (
+            session.query(func.count(func.distinct(Properties.url)))
+            .filter(*filter_condition)
+            .scalar()
+        )
+        max_page = math.ceil(total_urls / PAGE_SIZE)
+        # query unique urls
+        query = (
+            select(func.distinct(Properties.url))
+            .filter(*filter_condition)
+            .limit(PAGE_SIZE)
+            .offset(0 if page == 1 else page * PAGE_SIZE)
+        )
+        urls = [i[0] for i in session.execute(query).all()]
     properties = Property.objects.get_properties(urls)
-    return dict(results=properties)
+    return dict(
+        count=len(properties),
+        page=page,
+        max_page=max_page,
+        results=properties,
+    )

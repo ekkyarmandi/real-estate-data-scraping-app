@@ -1,21 +1,24 @@
 {% extends "base.html" %}
 <!--  -->
 {% block content %}
-<!-- [ ] Add period select -->
-<div class="flex relative">
+<div class="w-fit">
+  <div class="flex gap-2 mb-3">
+    <select id="period" class="px-2 py-1 text-sm rounded border bg-transparent hover:bg-gray-500 transition ease-in-out" placeholder="select the period">
+      <option value="2024-04-01">Apr 2024</option>
+      <option value="2024-05-01">May 2024</option>
+    </select>
+    <select id="workbook" class="px-2 py-1 text-sm rounded border bg-transparent hover:bg-gray-500 transition ease-in-out" placeholder="select the period">
+      <option value="Q1_MARCH_Working">Q1_MARCH_Working</option>
+      <option value="Q2_APRIL_Working">Q2_APRIL_Working</option>
+      <option value="Q2_MAY_Working">Q2_MAY_Working</option>
+    </select>
+    <button class="btn-load px-2 py-1 border rounded-md text-sm transition hover:text-black hover:border-slate-900 hover:bg-[#b6ed34] font-mono">Load</button>
+  </div>
+</div>
+<div class="main-container hidden flex relative">
   <div class="flex flex-col gap-4 w-[35%]">
     <div>
-      <h1 class="text-3xl">Dashboard</h1>
-      <div id="info">
-        <ul class="">
-          <li>
-            <p>Total Scraped: <span class="animate-pulse">Loading..</span></p>
-          </li>
-          <li>
-            <p>Total New Scraped: <span class="animate-pulse">Loading..</span></p>
-          </li>
-        </ul>
-      </div>
+      <div id="info"></div>
     </div>
     <div>
       <h3 class="font-bold text-xl">New Scraped Information</h3>
@@ -31,11 +34,7 @@
       </div>
     </div>
     <div>
-      <div class="flex gap-2">
-        <h3 class="font-bold text-xl">Spreadsheet Information</h3>
-        <p class="text-xs font-mono p-1 rounded border w-fit">Q1_MARCH_Working</p>
-      </div>
-      <!-- [ ] Create dropdown component to select the filename i.e. Q1_FEBRUARY_Working, Q1_MARCH_Working -->
+      <h3 class="font-bold text-xl">Spreadsheet Information</h3>
       <div id="sheet-info">
         <ul>
           <li>

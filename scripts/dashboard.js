@@ -43,12 +43,11 @@ async function getInfo(date) {
     .catch((err) => console.log(err));
 }
 
-async function getNewInfo() {
-  const response = await fetch("/api/v1/dashboard/new-info");
+async function getNewInfo(date) {
+  const params = new URLSearchParams({ date: date })
+  const response = await fetch("/api/v1/dashboard/new-info?" + params.toString());
   const data = await response.json();
   const info = document.getElementById("new-info");
-  const missing_percentage = 100 * data.total_missing_values / data.total_new_extracted;
-  const invalid_percentage = 100 * data.total_invalid_values / data.total_new_extracted;
   info.innerHTML = "";
   const content = `
   <ul>
@@ -56,14 +55,14 @@ async function getNewInfo() {
       <p>
         <span>Has Missing Values:</span>
         <span>${data.total_missing_values.toLocaleString()}</span>
-        <span>(<span class="text-gray-400">${missing_percentage.toFixed(2)}%</span>)</span>
+        <span>(<span class="text-gray-400">${data.total_missing_solved.toFixed(2)}%</span>)</span>
       </p>
     </li>
     <li>
       <p>
         <span>Has Invalid Values:</span>
         <span>${data.total_invalid_values.toLocaleString()}</span>
-        <span>(<span class="text-gray-400">${invalid_percentage.toFixed(2)}%</span>)</span>
+        <span>(<span class="text-gray-400">${data.total_invalid_solved.toFixed(2)}%</span>)</span>
       </p>
     </li>
   </ul>`;
@@ -160,10 +159,11 @@ async function getProperties(name, page = 1, is_exclusion = false) {
   }
 }
 
-async function getPropertiesOnType(propertyType, page = 1) {
+async function getPropertiesOnType(date, propertyType, page = 1) {
   // fetching the data
+  const params = new URLSearchParams({ date: date, type: propertyType, page: page })
   const container = document.getElementById("results");
-  const data = await fetch(`/api/v1/dashboard/property-types/unit?page=${page}&type=${propertyType}`).then(res => res.json()).catch((e) => { console.log(e) });
+  const data = await fetch("/api/v1/dashboard/property-types/unit?" + params.toString()).then(res => res.json()).catch((err) => { console.log(err) });
   // put data on the container
   container.innerHTML = "";
   data.results.forEach((item) => {
@@ -178,8 +178,9 @@ async function getPropertiesOnType(propertyType, page = 1) {
   labelsListener();
 }
 
-async function getPropertyLabels() {
-  const data = await fetch("/api/v1/dashboard/labels").then(res => res.json()).catch((err) => console.log(err));
+async function getPropertyLabels(date) {
+  const params = new URLSearchParams({ date: date })
+  const data = await fetch("/api/v1/dashboard/labels?" + params.toString()).then(res => res.json()).catch((err) => console.log(err));
   const labelLink = (label) => {
     return `<li>
       <p class="hover:cursor-pointer hover:text-blue-500 hover:underline font-mono text-sm w-fit" count=${label.count} onclick=getProperties('${label.label}')>
@@ -195,7 +196,7 @@ async function getPropertyLabels() {
         container.insertAdjacentHTML("BeforeEnd", labelLink(item));
       });
     } else {
-      container.innerHTML = "<p class='font-mono text-sm'>Clear</p>";
+      container.innerHTML = "<p class='font-mono text-sm text-green-500'>Clear</p>";
     }
   };
   const missingContainer = document.getElementById("missing-labels");
@@ -204,8 +205,9 @@ async function getPropertyLabels() {
   labelConstructor(invalidContainer, data.invalid);
 }
 
-async function getPropertyExcludedBy() {
-  const data = await fetch("/api/v1/dashboard/exclusions").then(res => res.json()).catch((err) => console.log(err));
+async function getPropertyExcludedBy(date) {
+  const params = new URLSearchParams({ date: date });
+  const data = await fetch("/api/v1/dashboard/exclusions?" + params.toString()).then(res => res.json()).catch((err) => console.log(err));
   const labelLink = (label) => {
     return `<li>
       <p class="hover:cursor-pointer hover:text-blue-500 hover:underline font-mono text-sm w-fit" count=${label.count} onclick=getProperties('${label.name}',1,true)>
@@ -270,25 +272,30 @@ function editMode(element) {
 //   </ul>
 // </div>
 
-async function getUniquePropertyType() {
-  const propertyType = (propertyType) => {
+async function getUniquePropertyType(date) {
+  const propertyType = (param) => {
     return `
       <li class="container flex gap-2 items-center">
-        <p class="text-sm font-mono hover:underline hover:text-blue-500 cursor-pointer" onclick="getPropertiesOnType('${propertyType.name}')">
-          <span>${propertyType.name}</span>
-          <span count=${propertyType.count}>(${propertyType.count.toLocaleString()})</span>
+        <p class="text-sm font-mono hover:underline hover:text-blue-500 cursor-pointer" onclick="getPropertiesOnType('${param.date}','${param.type.name}')">
+          <span>${param.type.name}</span>
+          <span count=${param.type.count}>(${param.type.count.toLocaleString()})</span>
         </p>
       </li>`;
   }
   const container = document.getElementById("property-types");
-  const response = await fetch("/api/v1/dashboard/property-types");
+  const params = new URLSearchParams({ date: date })
+  const response = await fetch("/api/v1/dashboard/property-types?" + params.toString());
   if (response.ok) {
     const results = await response.json();
     container.innerHTML = "";
-    results.forEach((text) => {
-      // append property type li into container
-      container.insertAdjacentHTML("beforeend", propertyType(text));
-    });
+    if (results.length > 0) {
+      results.forEach((text) => {
+        // append property type li into container
+        container.insertAdjacentHTML("beforeend", propertyType({ type: text, date: date }));
+      });
+    } else {
+      container.innerHTML = '<span class="font-mono text-sm">Villa (0)</span>';
+    }
   }
 }
 
@@ -305,11 +312,11 @@ async function loadWorkbook() {
       document.querySelector(".main-container").classList.remove("hidden");
       // load the data
       getInfo(selectedDate);
-      // getNewInfo();
+      getNewInfo(selectedDate);
       // getSpreadsheetURLs();
-      // getPropertyLabels();
-      // getPropertyExcludedBy();
-      // getUniquePropertyType();
+      getPropertyLabels(selectedDate);
+      getPropertyExcludedBy(selectedDate);
+      getUniquePropertyType(selectedDate);
     })
     .catch((err) => console.log(err));
   // show the result on the screen
@@ -319,7 +326,6 @@ function assignEventHandler() {
   const loadBtn = document.querySelector(".btn-load");
   loadBtn.addEventListener("click", loadWorkbook);
 }
-
 
 // init
 assignEventHandler();
