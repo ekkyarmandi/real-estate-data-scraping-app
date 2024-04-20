@@ -1,35 +1,46 @@
-async function getInfo(date, workbook) {
-  const params = new URLSearchParams({ date: date, workbook: workbook });
-  const data = await fetch("/api/v1/dashboard/total?" + params.toString()).then(res => res.json()).catch((err) => console.log(err));
-  const info = document.getElementById("info");
-  var extracted_percentage = 100 * data.total_extracted / data.total_scraped;
-  if (extracted_percentage > 100.0) {
-    extracted_percentage = Math.round(extracted_percentage);
-  }
-  var new_extracted_percentage = 100 * data.total_new_extracted / data.total_new_scraped;
-  if (new_extracted_percentage > 100.0) {
-    new_extracted_percentage = Math.round(new_extracted_percentage);
-  }
-  var new_excluded_percentage = 100 * data.total_new_excluded / data.total_new_scraped;
-  info.innerHTML = "";
-  const content = `
-  <ul class="">
-    <li>
-      <p>
+async function getInfo(date) {
+  const setContainer = (data, isLoading) => {
+    const info = document.getElementById("info");
+    info.innerHTML = ""; // reset info container 
+    const container = document.createElement("ul");
+    const liTotalScraped = document.createElement("li");
+    const liTotalNewScraped = document.createElement("li");
+    const loadingText = `<span class="animate-pulse">Loading..</span>`;
+    liTotalScraped.innerHTML = "Total Scraped: "
+    liTotalNewScraped.innerHTML = "Total New Scraped: "
+    container.insertAdjacentElement("beforeend", liTotalScraped);
+    container.insertAdjacentElement("beforeend", liTotalNewScraped);
+    if (isLoading) {
+      liTotalScraped.insertAdjacentHTML("beforeend", loadingText);
+      liTotalNewScraped.insertAdjacentHTML("beforeend", loadingText);
+    } else {
+      liTotalScraped.innerHTML = `
         <span>Total Scraped:</span>
         <span>${data.total_scraped.toLocaleString()}</span>
-        <span>(${extracted_percentage.toFixed(2)}% extracted)</span>
-      </p>
-    </li>
-    <li>
-      <p>
+        <span>(${data.extracted_percentage.toFixed(2)}% extracted)</span>
+      `;
+      liTotalNewScraped.innerHTML = `
         <span>Total New Scraped:</span>
         <span>${data.total_new_scraped.toLocaleString()}</span>
-        <span>(${new_extracted_percentage.toFixed(2)}% extracted, ${new_excluded_percentage.toFixed(2)}% excluded)</span>
-      </p>
-    </li>
-  </ul>`;
-  info.insertAdjacentHTML("BeforeEnd", content);
+        <span>(${data.new_extracted_percentage.toFixed(2)}% extracted, ${data.new_excluded_percentage.toFixed(2)}% excluded)</span>
+      `;
+    }
+    info.insertAdjacentElement("beforeend", container);
+  }
+  // constract request parameters
+  const params = new URLSearchParams({ date: date });
+  // set the status to loading state
+  var isLoading = true;
+  setContainer({}, isLoading);
+  // making a GET request
+  await fetch("/api/v1/dashboard/total?" + params.toString())
+    .then(async (res) => {
+      // update the info container
+      const data = await res.json();
+      var isLoading = false;
+      setContainer(data, isLoading);
+    })
+    .catch((err) => console.log(err));
 }
 
 async function getNewInfo() {
@@ -293,7 +304,7 @@ async function loadWorkbook() {
       // show the main container
       document.querySelector(".main-container").classList.remove("hidden");
       // load the data
-      getInfo(selectedDate, selectedWorkbook);
+      getInfo(selectedDate);
       // getNewInfo();
       // getSpreadsheetURLs();
       // getPropertyLabels();

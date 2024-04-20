@@ -163,45 +163,60 @@ async def query_new_properties(
 @router.get("/total")
 async def calculate_extracted(date: str = Depends(DateRange)):
     with Session() as session:
-        # count total scraped html/json
+        # how many data are being scraped? Count total scraped data from data table within selected period
         query = session.query(func.count(ScrapedData.url)).filter(
             ScrapedData.created_at >= date.start,
             ScrapedData.created_at <= date.end,
         )
         total_scraped = query.scalar()
-        # count total extracted on properties
+        # how many new data among the scraped data? Count total scraped data from source table based on date
+        query_result = (
+            session.query(Source.url)
+            .filter(
+                Source.scraped_at == date.for_source(),
+            )
+            .all()
+        )
+        new_scraped_urls = [i[0] for i in query_result]
+        # how many data are being extracted successfully? Count total new rows created on properties table based on selected period
         query = session.query(func.count(Properties.url)).filter(
             Properties.created_at >= date.start,
             Properties.created_at <= date.end,
         )
         total_extracted = query.scalar()
-        # calculate total new proeprty were being extracted
-        query = (
-            select(func.count(func.distinct(Properties.url)))
-            .select_from(
-                Source.__table__.join(Properties, Source.url == Properties.url)
-            )
-            .where(Source.is_excluded == "true")
+        # how many new data are being extracted successfully? Count total new scraped data being extracted
+        query = session.query(func.count(func.distinct(Properties.url))).filter(
+            Properties.url.in_(new_scraped_urls)
         )
-        total_new_extracted = session.execute(query).scalar()
-        # calculate total new property were being excluded
+        total_new_extracted = query.scalar()
+        # how many new data are being excluded already? Count total new scraped data that being excluded already
         query = session.query(func.count(Source.url)).filter(
             Source.scraped_at == date.for_source(),
             Source.is_excluded == "true",
         )
         total_new_excluded = query.scalar()
-        # calculate total new scraped for selected period
-        query = session.query(func.count(Source.url)).filter(
-            Source.scraped_at == date.for_source(),
-        )
-        total_new_scraped = query.scalar()
+
+    try:
+        extracted_percentage = 100 * total_extracted / total_scraped
+    except ZeroDivisionError:
+        extracted_percentage = 0
+
+    try:
+        new_extracted_percentage = 100 * total_new_extracted / len(new_scraped_urls)
+    except ZeroDivisionError:
+        new_extracted_percentage = 0
+
+    try:
+        new_excluded_percentage = 100 * total_new_excluded / len(new_scraped_urls)
+    except ZeroDivisionError:
+        new_excluded_percentage = 0
 
     return dict(
         total_scraped=total_scraped,
-        total_extracted=total_extracted,
-        total_new_scraped=total_new_scraped,
-        total_new_extracted=total_new_extracted,
-        total_new_excluded=total_new_excluded,
+        total_new_scraped=len(new_scraped_urls),
+        extracted_percentage=extracted_percentage,
+        new_extracted_percentage=new_extracted_percentage,
+        new_excluded_percentage=new_excluded_percentage,
     )
 
 
