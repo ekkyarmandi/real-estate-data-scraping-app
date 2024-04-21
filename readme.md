@@ -15,4 +15,4 @@ Data Scraped Quality Assurance: Admin Dashboard
 
 Change Logs:
 
-- v0.2.1 20 April 2024 [f52f481](https://github.com/ekkyarmandi/real-estate-data-scraping-app/commit/f52f4811e88b9e91a9350d6ac8e76b797fa66f74)
+- [v0.2.1 [20 April 2024]](changelogs/20240420.md)
