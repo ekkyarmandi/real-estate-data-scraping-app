@@ -1,7 +1,5 @@
 # Scrape Clean
 
-`version: 0.2.1 (20 April 2024)`
-
 Data Scraped Quality Assurance: Admin Dashboard
 
 ## Tables
@@ -13,6 +11,6 @@ Data Scraped Quality Assurance: Admin Dashboard
 - `sourcelabels`
 - `duplicates`
 
-Change Logs:
+## Change Logs:
 
-- [v0.2.1 [20 April 2024]](changelogs/20240420.md)
+- v0.2.1 [[20 April 2024]](changelogs/20240420.md)
