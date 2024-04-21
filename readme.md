@@ -15,4 +15,4 @@ Data Scraped Quality Assurance: Admin Dashboard
 
 Change Logs:
 
-- `v0.2.1 20 April 2024 [f52f481](/commit/f52f481)`
+- v0.2.1 20 April 2024 [f52f481](/commit/f52f481)
